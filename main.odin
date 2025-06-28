@@ -173,6 +173,27 @@ main :: proc() {
 
 	river_rectangle := rl.Rectangle{0, 0, 14, 8}
 
+	// Lillypad areas - 5 spots at the top row between grid cells
+	lillypad_areas := [?]rl.Rectangle {
+		{0.5, 2, 1, 1}, // between positions 1-2
+		{3.5, 2, 1, 1}, // between positions 3-4
+		{6.5, 2, 1, 1}, // between positions 5-6
+		{9.5, 2, 1, 1}, // between positions 7-8
+		{12.5, 2, 1, 1}, // between positions 9-10
+	}
+
+	frogger_reached_lillypads := [5]bool{}
+
+	turtles := [?]Entity {
+		{rectangle = {2, 4, 2, 1}, speed = -1.5, color = rl.DARKGREEN},
+		{rectangle = {6, 4, 2, 1}, speed = -1.5, color = rl.DARKGREEN},
+		{rectangle = {10, 4, 2, 1}, speed = -1.5, color = rl.DARKGREEN},
+		{rectangle = {14, 4, 2, 1}, speed = -1.5, color = rl.DARKGREEN},
+		{rectangle = {1, 7, 3, 1}, speed = 1.8, color = rl.DARKGREEN},
+		{rectangle = {6, 7, 3, 1}, speed = 1.8, color = rl.DARKGREEN},
+		{rectangle = {11, 7, 3, 1}, speed = 1.8, color = rl.DARKGREEN},
+	}
+
 	for !rl.WindowShouldClose() {
 		// gameplay
 		can_frogger_request_to_hop := frogger_lerp_hop_timer <= 0
@@ -231,6 +252,7 @@ main :: proc() {
 
 		move_entities(vehicles[:], f32(number_of_grid_cells_on_axis_x))
 		move_entities(floating_logs[:], f32(number_of_grid_cells_on_axis_x))
+		move_entities(turtles[:], f32(number_of_grid_cells_on_axis_x))
 
 		// when the frog is on log, the frog moves with log
 
@@ -255,7 +277,6 @@ main :: proc() {
 			}
 		}
 
-		turtles: [0]Entity
 		for turtle in turtles {
 			turtle_rectangle := turtle.rectangle
 			is_frog_on_turtle := rl.CheckCollisionPointRec(frogger_center_pos, turtle_rectangle)
@@ -273,7 +294,17 @@ main :: proc() {
 		if should_check_if_frogger_drowns_in_river {
 			frogger_center_pos := frogger_pos + 0.5
 			is_fogger_in_river := rl.CheckCollisionPointRec(frogger_center_pos, river_rectangle)
-			if is_fogger_in_river {
+
+			// Don't drown if frogger is on a lillypad area
+			is_on_lillypad := false
+			for lillypad_area in lillypad_areas {
+				if rl.CheckCollisionPointRec(frogger_center_pos, lillypad_area) {
+					is_on_lillypad = true
+					break
+				}
+			}
+
+			if is_fogger_in_river && !is_on_lillypad {
 				frogger_pos = frogger_start_pos
 			}
 		}
@@ -285,6 +316,18 @@ main :: proc() {
 			)
 			if is_frogger_hit {
 				rl.PlaySound(sfx_squish)
+				frogger_pos = frogger_start_pos
+			}
+		}
+
+		// Check if frogger reached any lillypad areas
+		for lillypad_area, i in lillypad_areas {
+			frogger_center := get_cell_center_pos(frogger_pos)
+			is_frogger_on_lillypad := rl.CheckCollisionPointRec(frogger_center, lillypad_area)
+
+			if is_frogger_on_lillypad {
+				frogger_reached_lillypads[i] = true
+				// Reset frogger position after reaching lillypad
 				frogger_pos = frogger_start_pos
 			}
 		}
@@ -337,22 +380,22 @@ main :: proc() {
 				rl.WHITE,
 			)
 
-			frogger_death_render_rectangle := rl.Rectangle{0, 0, f32(cell_size), f32(cell_size)}
-			frogger_death_scaled_sprite_sheet_clip := rl.Rectangle {
-				frogger_death_sprite_clip.x * sprite_sheet_cell_size,
-				frogger_death_sprite_clip.y * sprite_sheet_cell_size,
-				frogger_death_sprite_clip.width * sprite_sheet_cell_size,
-				frogger_death_sprite_clip.height * sprite_sheet_cell_size,
-			}
+			// frogger_death_render_rectangle := rl.Rectangle{0, 0, f32(cell_size), f32(cell_size)}
+			// frogger_death_scaled_sprite_sheet_clip := rl.Rectangle {
+			// 	frogger_death_sprite_clip.x * sprite_sheet_cell_size,
+			// 	frogger_death_sprite_clip.y * sprite_sheet_cell_size,
+			// 	frogger_death_sprite_clip.width * sprite_sheet_cell_size,
+			// 	frogger_death_sprite_clip.height * sprite_sheet_cell_size,
+			// }
 
-			rl.DrawTexturePro(
-				texture_sprite_sheet,
-				frogger_death_scaled_sprite_sheet_clip,
-				frogger_death_render_rectangle,
-				[2]f32{},
-				0,
-				rl.WHITE,
-			)
+			// rl.DrawTexturePro(
+			// 	texture_sprite_sheet,
+			// 	frogger_death_scaled_sprite_sheet_clip,
+			// 	frogger_death_render_rectangle,
+			// 	[2]f32{},
+			// 	0,
+			// 	rl.WHITE,
+			// )
 
 			// rl.DrawTexture(texture_sprite_sheet, 0, 0, rl.WHITE)
 			// draw_rectangle_lines_on_grid(river_rectangle, 5, rl.DARKBLUE, f32(cell_size))
@@ -370,7 +413,20 @@ main :: proc() {
 			// draw_rectangle_lines_on_grid(sidewalk_rectangle, 5, rl.PURPLE, f32(cell_size))
 
 			draw_entities_with_padding(floating_logs[:], f32(cell_size), 0, 0.1)
+			draw_entities_with_padding(turtles[:], f32(cell_size), 0, 0.1)
 			draw_entities_with_padding(vehicles[:], f32(cell_size), 0, 0.1)
+
+
+			// Draw lillypad areas that have been reached as bright green rectangles
+			for lillypad_area, i in lillypad_areas {
+				if frogger_reached_lillypads[i] {
+					draw_rectangle_on_grid(
+						lillypad_area,
+						rl.Color{50, 255, 50, 255},
+						f32(cell_size),
+					)
+				}
+			}
 
 			frogger_rectangle := rl.Rectangle{frogger_pos.x, frogger_pos.y, 1, 1}
 			draw_rectangle_on_grid(frogger_rectangle, rl.GREEN, f32(cell_size))
