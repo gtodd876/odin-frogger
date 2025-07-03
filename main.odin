@@ -36,6 +36,39 @@ draw_rectangle_lines_on_grid :: proc(
 	rl.DrawRectangleLinesEx(render_rectangle, line_thick, color)
 }
 
+draw_sprite_on_grid :: proc(
+	grid_pos: [2]f32,
+	sprite_clip: rl.Rectangle,
+	texture: rl.Texture2D,
+	sprite_sheet_cell_size: f32,
+	cell_size: f32,
+	rotation: f32 = 0,
+) {
+	// Source rectangle from sprite sheet
+	src_rect := rl.Rectangle {
+		sprite_clip.x * sprite_sheet_cell_size,
+		sprite_clip.y * sprite_sheet_cell_size,
+		sprite_clip.width * sprite_sheet_cell_size,
+		sprite_clip.height * sprite_sheet_cell_size,
+	}
+	
+	// Destination rectangle on screen - center it on the grid position
+	dst_rect := rl.Rectangle {
+		(grid_pos.x + 0.5) * cell_size,
+		(grid_pos.y + 0.5) * cell_size,
+		sprite_clip.width * cell_size,
+		sprite_clip.height * cell_size,
+	}
+	
+	// Origin point for rotation (center of sprite)
+	origin := [2]f32{
+		sprite_clip.width * cell_size * 0.5,
+		sprite_clip.height * cell_size * 0.5,
+	}
+	
+	rl.DrawTexturePro(texture, src_rect, dst_rect, origin, rotation, rl.WHITE)
+}
+
 // NOTE: come up with examples of passing lists of things to functions
 
 move_entities :: proc(entities: []Entity, max_x: f32) {
@@ -139,6 +172,18 @@ main :: proc() {
 	frogger_lerp_hop_timer: f32 = 0
 	frogger_lerp_hop_start_pos: [2]f32
 	frogger_lerp_hop_end_pos: [2]f32
+	
+	// Animation timing - triggered on hop start
+	frogger_animation_timer: f32 = 0
+	frogger_animation_frame_duration: f32 = 0.1  // 10fps to see each frame clearly
+	frogger_current_animation_frame: i32 = 0
+	frogger_animation_playing: bool = false
+	
+	// Animation sequence: 3,2,1,2,3 (5 frames total)
+	frog_animation_sequence := [4]i32{3, 2, 1, 3}
+	
+	// Frog facing direction (0=up, 1=right, 2=down, 3=left)
+	frogger_facing_direction: i32 = 0
 
 	frogger_death_timer_duration: f32 = 1
 	frogger_death_timer: f32 = frogger_death_timer_duration
@@ -146,6 +191,11 @@ main :: proc() {
 	frogger_death_sprite_clip := rl.Rectangle{0, 3, 1, 1}
 
 	sprite_sheet_cell_size: f32 = 16
+	
+	// Frog sprite clips (first 3 sprites on top row)
+	frog_sprite_1 := rl.Rectangle{0, 0, 1, 1}           // First sprite
+	frog_sprite_2 := rl.Rectangle{1, 0, 1, 1}           // Second sprite  
+	frog_sprite_3 := rl.Rectangle{2, 0, 1, 1}           // Third sprite - idle/default
 
 	floating_logs := [?]Entity {
 		{rectangle = {1, 3, 4, 1}, speed = 2, color = rl.BROWN},
@@ -172,6 +222,30 @@ main :: proc() {
 	}
 
 	river_rectangle := rl.Rectangle{0, 0, 14, 8}
+
+	// Lillypad areas - 5 spots at the top row between grid cells
+	lillypad_areas := [?]rl.Rectangle {
+		{0.5, 2, 1, 1}, // between positions 1-2
+		{3.5, 2, 1, 1}, // between positions 3-4
+		{6.5, 2, 1, 1}, // between positions 5-6
+		{9.5, 2, 1, 1}, // between positions 7-8
+		{12.5, 2, 1, 1}, // between positions 9-10
+	}
+
+	// Bog area - rows 1 and 2, excluding lillypad areas
+	bog_rectangle := rl.Rectangle{0, 1, 14, 2}
+
+	frogger_reached_lillypads := [5]bool{}
+
+	turtles := [?]Entity {
+		{rectangle = {2, 4, 2, 1}, speed = -1.5, color = rl.DARKGREEN},
+		{rectangle = {6, 4, 2, 1}, speed = -1.5, color = rl.DARKGREEN},
+		{rectangle = {10, 4, 2, 1}, speed = -1.5, color = rl.DARKGREEN},
+		{rectangle = {14, 4, 2, 1}, speed = -1.5, color = rl.DARKGREEN},
+		{rectangle = {1, 7, 3, 1}, speed = 1.8, color = rl.DARKGREEN},
+		{rectangle = {6, 7, 3, 1}, speed = 1.8, color = rl.DARKGREEN},
+		{rectangle = {11, 7, 3, 1}, speed = 1.8, color = rl.DARKGREEN},
+	}
 
 	for !rl.WindowShouldClose() {
 		// gameplay
@@ -209,9 +283,25 @@ main :: proc() {
 							number_of_tiles_for_lives_and_time_data
 
 				if !is_frogger_next_position_out_of_bounds {
+					// Update facing direction based on movement
+					if move_direction.y < 0 {
+						frogger_facing_direction = 0  // Up
+					} else if move_direction.x > 0 {
+						frogger_facing_direction = 1  // Right
+					} else if move_direction.y > 0 {
+						frogger_facing_direction = 2  // Down
+					} else if move_direction.x < 0 {
+						frogger_facing_direction = 3  // Left
+					}
+					
 					frogger_lerp_hop_timer = frogger_lerp_hop_duration
 					frogger_lerp_hop_start_pos = frogger_pos
 					frogger_lerp_hop_end_pos = frogger_next_pos
+					
+					// Start hop animation
+					frogger_animation_playing = true
+					frogger_animation_timer = 0
+					frogger_current_animation_frame = 0
 				}
 			}
 		} else {
@@ -231,6 +321,22 @@ main :: proc() {
 
 		move_entities(vehicles[:], f32(number_of_grid_cells_on_axis_x))
 		move_entities(floating_logs[:], f32(number_of_grid_cells_on_axis_x))
+		move_entities(turtles[:], f32(number_of_grid_cells_on_axis_x))
+
+		// Update hop animation
+		if frogger_animation_playing {
+			frogger_animation_timer += rl.GetFrameTime()
+			if frogger_animation_timer >= frogger_animation_frame_duration {
+				frogger_animation_timer = 0
+				frogger_current_animation_frame += 1
+				
+				// Animation complete after all 5 frames (3,2,1,2,3)
+				if frogger_current_animation_frame >= 4 {
+					frogger_animation_playing = false
+					frogger_current_animation_frame = 0
+				}
+			}
+		}
 
 		// when the frog is on log, the frog moves with log
 
@@ -255,7 +361,6 @@ main :: proc() {
 			}
 		}
 
-		turtles: [0]Entity
 		for turtle in turtles {
 			turtle_rectangle := turtle.rectangle
 			is_frog_on_turtle := rl.CheckCollisionPointRec(frogger_center_pos, turtle_rectangle)
@@ -268,12 +373,34 @@ main :: proc() {
 			}
 		}
 
+		// Check if frog goes out of bounds while floating (riding logs/turtles)
+		if is_frogger_floating {
+			frogger_out_of_bounds_left := frogger_pos.x < -1
+			frogger_out_of_bounds_right := frogger_pos.x > f32(number_of_grid_cells_on_axis_x)
+			
+			if frogger_out_of_bounds_left || frogger_out_of_bounds_right {
+				frogger_pos = frogger_start_pos
+				frogger_lerp_hop_start_pos = frogger_start_pos
+				frogger_lerp_hop_end_pos = frogger_start_pos
+				frogger_lerp_hop_timer = 0
+			}
+		}
 
 		should_check_if_frogger_drowns_in_river := !is_frogger_floating
 		if should_check_if_frogger_drowns_in_river {
 			frogger_center_pos := frogger_pos + 0.5
 			is_fogger_in_river := rl.CheckCollisionPointRec(frogger_center_pos, river_rectangle)
-			if is_fogger_in_river {
+
+			// Don't drown if frogger is on a lillypad area
+			is_on_lillypad := false
+			for lillypad_area in lillypad_areas {
+				if rl.CheckCollisionPointRec(frogger_center_pos, lillypad_area) {
+					is_on_lillypad = true
+					break
+				}
+			}
+
+			if is_fogger_in_river && !is_on_lillypad {
 				frogger_pos = frogger_start_pos
 			}
 		}
@@ -286,6 +413,41 @@ main :: proc() {
 			if is_frogger_hit {
 				rl.PlaySound(sfx_squish)
 				frogger_pos = frogger_start_pos
+			}
+		}
+
+		// Check if frogger reached any lillypad areas
+		for lillypad_area, i in lillypad_areas {
+			frogger_center := get_cell_center_pos(frogger_pos)
+			is_frogger_on_lillypad := rl.CheckCollisionPointRec(frogger_center, lillypad_area)
+
+			if is_frogger_on_lillypad {
+				frogger_reached_lillypads[i] = true
+				// Reset frogger position after reaching lillypad
+				frogger_pos = frogger_start_pos
+			}
+		}
+
+		// Check if frogger collided with bog areas (excluding lillypads)
+		frogger_center := get_cell_center_pos(frogger_pos)
+		is_frogger_in_bog := rl.CheckCollisionPointRec(frogger_center, bog_rectangle)
+		
+		if is_frogger_in_bog {
+			// Check if frogger is NOT on a lillypad area
+			is_on_lillypad := false
+			for lillypad_area in lillypad_areas {
+				if rl.CheckCollisionPointRec(frogger_center, lillypad_area) {
+					is_on_lillypad = true
+					break
+				}
+			}
+			
+			// If in bog but not on lillypad, frogger dies
+			if !is_on_lillypad {
+				frogger_pos = frogger_start_pos
+				frogger_lerp_hop_start_pos = frogger_start_pos
+				frogger_lerp_hop_end_pos = frogger_start_pos
+				frogger_lerp_hop_timer = 0
 			}
 		}
 
@@ -337,22 +499,22 @@ main :: proc() {
 				rl.WHITE,
 			)
 
-			frogger_death_render_rectangle := rl.Rectangle{0, 0, f32(cell_size), f32(cell_size)}
-			frogger_death_scaled_sprite_sheet_clip := rl.Rectangle {
-				frogger_death_sprite_clip.x * sprite_sheet_cell_size,
-				frogger_death_sprite_clip.y * sprite_sheet_cell_size,
-				frogger_death_sprite_clip.width * sprite_sheet_cell_size,
-				frogger_death_sprite_clip.height * sprite_sheet_cell_size,
-			}
+			// frogger_death_render_rectangle := rl.Rectangle{0, 0, f32(cell_size), f32(cell_size)}
+			// frogger_death_scaled_sprite_sheet_clip := rl.Rectangle {
+			// 	frogger_death_sprite_clip.x * sprite_sheet_cell_size,
+			// 	frogger_death_sprite_clip.y * sprite_sheet_cell_size,
+			// 	frogger_death_sprite_clip.width * sprite_sheet_cell_size,
+			// 	frogger_death_sprite_clip.height * sprite_sheet_cell_size,
+			// }
 
-			rl.DrawTexturePro(
-				texture_sprite_sheet,
-				frogger_death_scaled_sprite_sheet_clip,
-				frogger_death_render_rectangle,
-				[2]f32{},
-				0,
-				rl.WHITE,
-			)
+			// rl.DrawTexturePro(
+			// 	texture_sprite_sheet,
+			// 	frogger_death_scaled_sprite_sheet_clip,
+			// 	frogger_death_render_rectangle,
+			// 	[2]f32{},
+			// 	0,
+			// 	rl.WHITE,
+			// )
 
 			// rl.DrawTexture(texture_sprite_sheet, 0, 0, rl.WHITE)
 			// draw_rectangle_lines_on_grid(river_rectangle, 5, rl.DARKBLUE, f32(cell_size))
@@ -370,10 +532,58 @@ main :: proc() {
 			// draw_rectangle_lines_on_grid(sidewalk_rectangle, 5, rl.PURPLE, f32(cell_size))
 
 			draw_entities_with_padding(floating_logs[:], f32(cell_size), 0, 0.1)
+			draw_entities_with_padding(turtles[:], f32(cell_size), 0, 0.1)
 			draw_entities_with_padding(vehicles[:], f32(cell_size), 0, 0.1)
 
-			frogger_rectangle := rl.Rectangle{frogger_pos.x, frogger_pos.y, 1, 1}
-			draw_rectangle_on_grid(frogger_rectangle, rl.GREEN, f32(cell_size))
+
+			// Draw lillypad areas that have been reached as bright green rectangles
+			for lillypad_area, i in lillypad_areas {
+				if frogger_reached_lillypads[i] {
+					draw_rectangle_on_grid(
+						lillypad_area,
+						rl.Color{50, 255, 50, 255},
+						f32(cell_size),
+					)
+				}
+			}
+
+			// Determine which frog sprite to use based on animation frame
+			current_frog_sprite := frog_sprite_3  // Default idle sprite
+			if frogger_animation_playing {
+				// During hop animation, use the sequence: 3,2,1,2,3
+				sprite_number := frog_animation_sequence[frogger_current_animation_frame]
+				switch sprite_number {
+				case 1:
+					current_frog_sprite = frog_sprite_1
+				case 2:
+					current_frog_sprite = frog_sprite_2
+				case 3:
+					current_frog_sprite = frog_sprite_3
+				}
+			}
+			
+			// Calculate rotation based on facing direction
+			rotation_angle: f32 = 0
+			switch frogger_facing_direction {
+			case 0: // Up
+				rotation_angle = 0
+			case 1: // Right
+				rotation_angle = 90
+			case 2: // Down
+				rotation_angle = 180
+			case 3: // Left
+				rotation_angle = 270
+			}
+			
+			// Draw frog sprite with rotation
+			draw_sprite_on_grid(
+				frogger_pos,
+				current_frog_sprite,
+				texture_sprite_sheet,
+				sprite_sheet_cell_size,
+				f32(cell_size),
+				rotation_angle,
+			)
 
 			if debug_show_grid {
 				// draw grid
