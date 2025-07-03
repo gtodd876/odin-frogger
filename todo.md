@@ -1,18 +1,18 @@
 TODO:
 [x] change rendering so frogger is on top of obstacles
-[ ] Draw more obstacles
+[x] Draw more obstacles
     [x] Logs
-    [ ] Turtles
+    [x] Turtles
     [x] Vehicles
-[ ] Draw Lilypads
+[x] Draw Lilypads
 [x] Frogger Moves on river obstacles
-    [ ] frogger moves on obstacle while idle
-    [ ] if frogger hops on obstscle, he will hop moving with the obstacle - so that his hop is relative to the movement of the object. I'll attach an image/diagram to explain this
+    [x] frogger moves on obstacle while idle
+    [x] if frogger hops on obstscle, he will hop moving with the obstacle - so that his hop is relative to the movement of the object. I'll attach an image/diagram to explain this
 [x] Frogger can't hop out of bouds
-[ ] Frogger gets killed by going out of bounds while riding a- and respawns 
-[ ] Frogger gets killed by drowning - and respawns
-[ ] Frogger gets killed by colliding with bog - and respawns
-[ ] Frogger "marks" that he entered a lilypad and respawns
+[x] Frogger gets killed by going out of bounds while riding a log and respawns 
+[x] Frogger gets killed by drowning - and respawns
+[x] Frogger gets killed by colliding with bog - and respawns
+[x] Frogger "marks" that he entered a lilypad and respawns
 [ ] Replace rectangle art with sprite art
 [ ] Turtles that dive underwater
     [ ] Animation
