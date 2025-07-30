@@ -2,5 +2,5 @@ frogger.dSYM/**/*
 frogger
 odin-frogger
 main
-bin/
+build/
 .DS_Store

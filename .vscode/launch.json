@@ -5,9 +5,9 @@
             "name": "Debug Odin Program",
             "type": "lldb",
             "request": "launch",
-            "program": "${workspaceFolder}/bin/frogger",
+            "program": "${workspaceFolder}/build/frogger",
             "args": [],
-            "cwd": "${workspaceFolder}/src",
+            "cwd": "${workspaceFolder}",
             "preLaunchTask": "build-debug"
         }
     ]
