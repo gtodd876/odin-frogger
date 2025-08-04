@@ -30,12 +30,4 @@ TODO:
 
 
 
-Enumerated arrays - study them
-
-don't understand what this hot reload code does
-```odin
-@(export)
-game_hot_reload :: proc(mem: rawptr) {
-    gmem = (^Game_Memory)(mem)
-}
-```
+Enumerated arrays - study them 

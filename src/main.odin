@@ -268,11 +268,11 @@ frogger_lerp_hop_duration: f32 = 0.1
 @(export)
 game_init :: proc() {
 	gmem = new(Game_Memory)
-	game_render_target := rl.LoadRenderTexture(
+	gmem.game_render_target = rl.LoadRenderTexture(
 		i32(global_game_view_pixels_width),
 		i32(global_game_view_pixels_height),
 	)
-	rl.SetTextureFilter(game_render_target.texture, rl.TextureFilter.BILINEAR)
+	rl.SetTextureFilter(gmem.game_render_target.texture, rl.TextureFilter.BILINEAR)
 	// Load font
 	gmem.font = rl.LoadFontFromMemory(
 		".otf",
