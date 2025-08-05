@@ -27,3 +27,7 @@ TODO:
 [ ] Alligator in Lilypad area
 [ ] Snakes
 [ ] Otter
+
+
+
+Enumerated arrays - study them 

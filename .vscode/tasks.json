@@ -7,10 +7,10 @@
             "command": "odin",
             "args": [
                 "build",
-                "${workspaceFolder}/src",
+                "${workspaceFolder}/src/main_default",
                 "-debug",
                 "-o:none",
-                "-out:${workspaceFolder}/bin/frogger"
+                "-out:${workspaceFolder}/build/frogger"
             ],
             "group": {
                 "kind": "build",
